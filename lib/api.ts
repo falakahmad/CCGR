@@ -23,16 +23,27 @@ export async function fetchGoldPrice() {
 
 export async function fetchCurrencies() {
   try {
-    const res = await fetch(CURRENCY_NAMES_URL);
-    if (!res.ok) throw new Error("Failed to fetch currency names");
-    const data = await res.json();
+    // 1. Fetch names
+    const namesRes = await fetch(CURRENCY_NAMES_URL);
+    if (!namesRes.ok) throw new Error("Failed to fetch currency names");
+    const namesData = await namesRes.json();
 
-    // Transform { "usd": "United States Dollar" } to [{ code: "USD", name: "United States Dollar" }]
-    return Object.entries(data)
-      .map(([code, name]) => ({
-        code: code.toUpperCase(),
-        name: name as string,
-      }))
+    // 2. Fetch supported codes from the exchange rate API
+    const ratesRes = await fetch(`${CURRENCY_API_BASE}/USD`);
+    if (!ratesRes.ok) throw new Error("Failed to fetch supported codes");
+    const ratesData = await ratesRes.json();
+    const supportedCodes = Object.keys(ratesData.rates);
+
+    // 3. Intersect and transform
+    return supportedCodes
+      .map((code) => {
+        const lowerCode = code.toLowerCase();
+        return {
+          code: code.toUpperCase(),
+          name: namesData[lowerCode] || code.toUpperCase(),
+        };
+      })
+      .filter((c) => c.name.trim() !== "")
       .sort((a, b) => a.code.localeCompare(b.code));
   } catch (error) {
     console.error("Error fetching currencies, using fallback:", error);
